@@ -11,9 +11,10 @@ import (
 
 const usage = `Usage: nanny <file/dir> <commands>
 
-Example:
+Examples:
 
-    nanny . "go build foo.go; echo 'rinse, repeat"
+    nanny . "go build nanny.go; echo 'rinse, repeat'"
+    nanny README.markdown "markdown README.markdown > temp.html; open temp.html"
 
 `
 
@@ -39,7 +40,7 @@ func newWatcher(path string) *watcher {
 	return &watcher{path}
 }
 
-func (w *watcher) watch(changed chan<- bool) {
+func (w *watcher) watch() {
 	// todo use inotify here rather than poll
 	startTime, _ := w.newestMod()
 	for {
@@ -48,7 +49,6 @@ func (w *watcher) watch(changed chan<- bool) {
 			currentTime, file := w.newestMod()
 			if currentTime.After(startTime) {
 				debugf("%s: changed at %v\n", file, currentTime)
-				changed <- true
 				return
 			}
 		}
@@ -68,36 +68,20 @@ func (w *watcher) newestMod() (modTime time.Time, file string) {
 
 // runner runs commands
 type runner struct {
-	rawCmds []string
+	cmds string
 }
 
-func newRunner(cmdsArg string) *runner {
-	cmds := strings.Split(cmdsArg, ";")
-	for i, rawCmd := range cmds {
-		cmds[i] = strings.Trim(rawCmd, " ")
-	}
+func newRunner(cmds string) *runner {
 	return &runner{cmds}
 }
 
 func (r *runner) run() {
-	for _, rawCmd := range r.rawCmds {
-		debugf("%s: running now\n", rawCmd)
-		err := runCommand(rawCmd)
-		if err != nil {
-			debugf("%s: exited with error: %v\n", rawCmd, err)
-		} else {
-			debugf("%s: exited ok\n", rawCmd)
-		}
-	}
-}
-
-// starts the command and waits for it to exit synchronously
-func runCommand(rawCmd string) error {
-	args := strings.Split(rawCmd, " ")
-	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Stdout = os.Stdout
+	cmd := exec.Command(os.Getenv("SHELL"))
 	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	cmd.Stdout = os.Stdout
+	cmd.Stdin = strings.NewReader(r.cmds)
+	err := cmd.Run()
+	debugf("%s: exited with error: %v\n", cmd, err)
 }
 
 func main() {
@@ -109,12 +93,8 @@ func main() {
 	w := newWatcher(os.Args[1])
 	r := newRunner(os.Args[2])
 
-	changed := make(chan bool)
 	for {
-		go w.watch(changed)
-		select {
-		case <-changed:
-			r.run()
-		}
+		w.watch()
+		r.run()
 	}
 }
