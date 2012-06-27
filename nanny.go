@@ -34,13 +34,11 @@ type watcher struct {
 func (w *watcher) watch() {
 	startTime, _ := w.newestMod()
 	for {
-		select {
-		case <-time.Tick(time.Second):
-			currentTime, file := w.newestMod()
-			if currentTime.After(startTime) {
-				debugf("%s: changed at %v\n", file, currentTime)
-				return
-			}
+		time.Sleep(time.Second)
+		currentTime, file := w.newestMod()
+		if currentTime.After(startTime) {
+			debugf("%s: changed at %v\n", file, currentTime)
+			return
 		}
 	}
 }
