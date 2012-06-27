@@ -31,17 +31,7 @@ type watcher struct {
 	path string
 }
 
-func newWatcher(path string) *watcher {
-	_, err := os.Stat(path)
-	if pe, ok := err.(*os.PathError); ok {
-		fmt.Printf("%s: %s\n", pe.Path, pe.Err)
-		os.Exit(1)
-	}
-	return &watcher{path}
-}
-
 func (w *watcher) watch() {
-	// todo use inotify here rather than poll
 	startTime, _ := w.newestMod()
 	for {
 		select {
@@ -68,20 +58,17 @@ func (w *watcher) newestMod() (modTime time.Time, file string) {
 
 // runner runs commands
 type runner struct {
-	cmds string
-}
-
-func newRunner(cmds string) *runner {
-	return &runner{cmds}
+	shell string
+	cmds  string
 }
 
 func (r *runner) run() {
-	cmd := exec.Command(os.Getenv("SHELL"))
+	cmd := exec.Command(r.shell)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = strings.NewReader(r.cmds)
 	err := cmd.Run()
-	debugf("%s: exited with error: %v\n", cmd, err)
+	debugf("%s: exited with error: %v\n", r.cmds, err)
 }
 
 func main() {
@@ -90,9 +77,24 @@ func main() {
 		os.Exit(1)
 	}
 
-	w := newWatcher(os.Args[1])
-	r := newRunner(os.Args[2])
+	w := &watcher{os.Args[1]}
+	_, err := os.Stat(w.path)
+	if err != nil {
+		error := err.Error()
+		if pe, ok := err.(*os.PathError); ok {
+			error = pe.Err.Error()
+		}
+		fmt.Printf("%s: %s\n", w.path, error)
+		os.Exit(1)
+	}
 
+	shell := os.Getenv("SHELL") // todo add ComSpec for windows (with /C flag to exit on completion)
+	if shell == "" {
+		fmt.Printf("Missing SHELL environment variable\n")
+		os.Exit(1)
+	}
+
+	r := &runner{shell, os.Args[2]}
 	for {
 		w.watch()
 		r.run()
