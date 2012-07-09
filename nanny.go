@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,16 +16,7 @@ Examples:
 
     nanny . "go build nanny.go; echo 'rinse, repeat'"
     nanny README.markdown "markdown README.markdown > temp.html; open temp.html"
-
 `
-
-const debug = false
-
-func debugf(msg string, args ...interface{}) {
-	if debug {
-		fmt.Printf(msg, args...)
-	}
-}
 
 // watcher watches a file/dir for changes
 type watcher struct {
@@ -35,9 +27,8 @@ func (w *watcher) watch() {
 	startTime, _ := w.newestMod()
 	for {
 		time.Sleep(time.Second)
-		currentTime, file := w.newestMod()
+		currentTime, _ := w.newestMod()
 		if currentTime.After(startTime) {
-			debugf("%s: changed at %v\n", file, currentTime)
 			return
 		}
 	}
@@ -65,13 +56,12 @@ func (r *runner) run() {
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = strings.NewReader(r.cmds)
-	err := cmd.Run()
-	debugf("%s: exited with error: %v\n", r.cmds, err)
+	cmd.Run() // todo check result!
 }
 
 func main() {
 	if len(os.Args) != 3 {
-		fmt.Printf(usage)
+		fmt.Println(usage)
 		os.Exit(1)
 	}
 
@@ -82,17 +72,30 @@ func main() {
 		if pe, ok := err.(*os.PathError); ok {
 			error = pe.Err.Error()
 		}
-		fmt.Printf("%s: %s\n", w.path, error)
+		fmt.Println(w.path + ": " + error)
 		os.Exit(1)
 	}
 
 	shell := os.Getenv("SHELL") // todo add ComSpec for windows (with /C flag to exit on completion)
 	if shell == "" {
-		fmt.Printf("Missing SHELL environment variable\n")
+		fmt.Println("Missing SHELL environment variable")
 		os.Exit(1)
 	}
 
 	r := &runner{shell, os.Args[2]}
+
+	// quit if we recieve EOF on stdin, otherwise if started as a detached process
+	// from another detached process, it will become a zombie
+	go func() {
+		bs := make([]byte, 1)
+		for {
+			_, err := os.Stdin.Read(bs)
+			if err == io.EOF {
+				os.Exit(0)
+			}
+		}
+	}()
+
 	for {
 		w.watch()
 		r.run()
