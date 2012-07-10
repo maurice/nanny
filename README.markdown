@@ -10,7 +10,7 @@ Note: not tested and unlikely to work on Windows and (but shouldn't require big 
 Usage
 -----
 
-		nanny path/to/file/or/dir commands
+    nanny path/to/file/or/dir commands
 
 Whenever a change is detected, the `commands` are run in a new `$SHELL` sub-process and their `stdout` and `stderr` are redirected to the console.
 
@@ -30,6 +30,6 @@ Installation
 
 Install [Go](http://golang.org), then
 
-		go get github.org/maurice/nanny
+    go get github.org/maurice/nanny
 
 
