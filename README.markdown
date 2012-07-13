@@ -17,11 +17,15 @@ Whenever a change is detected, the `commands` are run in a new `$SHELL` sub-proc
 Examples
 --------
 
-1. Re-build a program whenever change is detected in the current directory and echo some output:
+1. Re-build a program whenever change is detected in the current directory:
 
-        nanny . "go build nanny.go; echo 'rinse, repeat'"
+        nanny . "go build nanny.go"
 
-2. Generate markup and open:
+    Watch a file and when it changes echo current date, re-compile, echo "OK" or "ERROR" depending on compile command exit code:
+
+    	nanny vhost.go "date; (go build vhost.go && echo OK) || echo ERROR"
+
+2. Generate markup and open in browser:
 
         nanny README.markdown "markdown README.markdown > /tmp/temp.html; open /tmp/temp.html"
 
